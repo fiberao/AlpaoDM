@@ -35,8 +35,22 @@ std::thread udploop;
 UInt nbAct;
 
 // Example using C++ API
-int dmExample(DM dm)
+int dmExample(String serialName)
 {
+	// Load configuration file
+	DM dm(serialName.c_str());
+	// Get the number of actuators
+	nbAct = (UInt)dm.Get("NbOfActuator");
+
+	// Check errors
+	if (!dm.Check())
+	{
+		return -1;
+	}
+
+	std::cout << "Number of actuators: " << nbAct << std::endl;
+
+	//network
 	sockVersion = MAKEWORD(2, 2);
 	if (WSAStartup(sockVersion, &wsaData) != 0)
 	{
@@ -64,8 +78,8 @@ int dmExample(DM dm)
 
 	while (true) {
 		int nAddrLen = sizeof(remoteAddr);
-		char recvData[512];
-		int ret = recvfrom(serSocket, recvData, 512, 0, (sockaddr *)&remoteAddr, &nAddrLen);
+		char recvData[1024];
+		int ret = recvfrom(serSocket, recvData, 1024, 0, (sockaddr *)&remoteAddr, &nAddrLen);
 		if (ret > 0)
 		{
 
@@ -115,18 +129,19 @@ int dmExample(DM dm)
 						dm.Send(voltage);
 						
 					}
-					char sendData[512];
+					char sendData[1024];
 					sprintf(sendData, "set point okay\n");
 					sendto(serSocket, sendData, strlen(sendData), 0, (sockaddr *)&remoteAddr, nAddrLen);
 					break;
 				}
 				case 3:
 				{
+		
 					//read
-					char sendData[512];
+					char sendData[1024];
 					sendData[0] = 0x00;
 					for (int i = 0; i < nbAct; i++)
-						sprintf(sendData + strlen(sendData), "%d ", voltage[i]);
+						sprintf(sendData + strlen(sendData), "%lf ", voltage[i]);
 					sprintf(sendData + strlen(sendData), "\n");
 					sendto(serSocket, sendData, strlen(sendData), 0, (sockaddr *)&remoteAddr, nAddrLen);
 					break;
@@ -146,10 +161,7 @@ int dmExample(DM dm)
 	closesocket(serSocket);
 	WSACleanup();
 
-   
-
-
-    return 0;
+    return dm.Stop();
 }
 
 // Main program
@@ -164,25 +176,16 @@ int main( int argc, char ** argv )
 		port = 5555;
 	else
 		sscanf(argv[1], "%d", &port);
-	std::cout << "Please enter the S/N within the following format: BXXYYY (see DM backside)" << std::endl;
+	/*std::cout << "Please enter the S/N within the following format: BXXYYY (see DM backside)" << std::endl;
 	std::cin >> serialName;
 	std::cin.ignore(10, '\n');
+	*/
+	serialName = "BAX152";
 	PINFO("Receiving command from UDP port: %d", port)
 	// Get serialName number
 	
-	// Load configuration file
-	DM dm(serialName.c_str());
-	// Get the number of actuators
-	nbAct = (UInt)dm.Get("NbOfActuator");
-
-	// Check errors
-	if (!dm.Check())
-	{
-		return -1;
-	}
-
-	std::cout << "Number of actuators: " << nbAct << std::endl;
-    int ret = dmExample(dm);
+	
+    int ret = dmExample(serialName);
     
     // Print last errors if any
     while ( !DM::Check() ) DM::PrintLastError();
